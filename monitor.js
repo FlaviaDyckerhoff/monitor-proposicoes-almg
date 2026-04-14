@@ -80,7 +80,7 @@ async function buscarProposicoesNovas(vistas) {
         numero: item.numero || '',
         ano: item.ano || ANO_ATUAL,
         autor: item.autor || item.nome || 'Não informado',
-        ementa: item.assunto || '',
+        ementa: item.ementa || item.assunto || item.resumo || '',
         data: item.dataPublicacao || '',
         link: `https://www.almg.gov.br/processo-legislativo/proposicoes/proposicao/?ano=${item.ano}&num=${item.numero}&tipo=${item.siglaTipoProjeto}`
       });
