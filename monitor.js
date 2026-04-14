@@ -45,7 +45,7 @@ async function buscarPagina(pagina) {
   }
 
   const json = await resp.json();
-  return json.resultadoPesquisa || {};
+  return json.resultado || {};
 }
 
 // ─── Busca todas as proposições novas ────────────────────────────────────────
@@ -80,7 +80,7 @@ async function buscarProposicoesNovas(vistas) {
         numero: item.numero || '',
         ano: item.ano || ANO_ATUAL,
         autor: item.autor || item.nome || 'Não informado',
-        ementa: item.ementa || item.resumo || '',
+        ementa: item.assunto || '',
         data: item.dataPublicacao || '',
         link: `https://www.almg.gov.br/processo-legislativo/proposicoes/proposicao/?ano=${item.ano}&num=${item.numero}&tipo=${item.siglaTipoProjeto}`
       });
