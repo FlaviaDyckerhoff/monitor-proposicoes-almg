@@ -113,7 +113,7 @@ function montarEmail(proposicoes) {
   let html = `
     <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
       <h2 style="color: #1a3a5c; border-bottom: 2px solid #1a3a5c; padding-bottom: 8px;">
-        🏛️ ALMG — ${proposicoes.length} nova${proposicoes.length > 1 ? 's' : ''} proposiç${proposicoes.length > 1 ? 'ões' : 'ão'} (${ANO_ATUAL})
+        🏛️ Assembleia Legislativa de Minas Gerais — ${proposicoes.length} nova${proposicoes.length > 1 ? 's' : ''} proposiç${proposicoes.length > 1 ? 'ões' : 'ão'} (${ANO_ATUAL})
       </h2>
   `;
 
@@ -166,7 +166,7 @@ async function enviarEmail(proposicoes) {
   });
 
   const html = montarEmail(proposicoes);
-  const assunto = `[ALMG] ${proposicoes.length} nova${proposicoes.length > 1 ? 's' : ''} proposiç${proposicoes.length > 1 ? 'ões' : 'ão'} — ${new Date().toLocaleDateString('pt-BR')}`;
+  const assunto = `🏛️ Minas Gerais: ${proposicoes.length} nova${proposicoes.length > 1 ? 's' : ''} proposiç${proposicoes.length > 1 ? 'ões' : 'ão'} — ${new Date().toLocaleDateString('pt-BR')}`;
 
   await transporter.sendMail({
     from: process.env.EMAIL_REMETENTE,
