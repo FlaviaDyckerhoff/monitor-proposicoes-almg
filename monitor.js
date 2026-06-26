@@ -25,6 +25,13 @@ function sleep(ms) {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
+function montarLinkProposicao(item) {
+  const tipo = encodeURIComponent(item.siglaTipoProjeto || item.tipoProjeto || 'OUTROS');
+  const numero = encodeURIComponent(item.numero || '');
+  const ano = encodeURIComponent(item.ano || ANO_ATUAL);
+  return `https://www.almg.gov.br/projetos-de-lei/${tipo}/${numero}/${ano}`;
+}
+
 // ─── Busca proposições de uma página ─────────────────────────────────────────
 async function buscarPagina(pagina) {
   const params = new URLSearchParams({
@@ -82,7 +89,7 @@ async function buscarProposicoesNovas(vistas) {
         autor: item.autor || item.nome || 'Não informado',
         ementa: item.ementa || item.assunto || item.resumo || '',
         data: item.dataPublicacao || '',
-        link: `https://www.almg.gov.br/processo-legislativo/proposicoes/proposicao/?ano=${item.ano}&num=${item.numero}&tipo=${item.siglaTipoProjeto}`
+        link: montarLinkProposicao(item)
       });
     }
 
@@ -111,7 +118,7 @@ function montarEmail(proposicoes) {
   }
 
   let html = `
-    <div style="font-family: Arial, sans-serif; max-width: 700px; margin: 0 auto;">
+    <div style="font-family: Arial, sans-serif; width: 100%; max-width: 920px; margin: 0 auto;">
       <h2 style="color: #1a3a5c; border-bottom: 2px solid #1a3a5c; padding-bottom: 8px;">
         🏛️ Assembleia Legislativa de Minas Gerais — ${proposicoes.length} nova${proposicoes.length > 1 ? 's' : ''} proposiç${proposicoes.length > 1 ? 'ões' : 'ão'} (${ANO_ATUAL})
       </h2>
