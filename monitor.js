@@ -9,6 +9,7 @@ function fichaEmailButtonHtml() {
 }
 
 const CONTROLE03_FORCE_LATEST = String(process.env.CONTROLE03_FORCE_LATEST || '').trim() === '1';
+const DRY_RUN = String(process.env.DRY_RUN || '').trim() === '1';
 const nodemailer = require('nodemailer');
 let promoverInteresseClienteProposicao = (_item, atuais) => Array.isArray(atuais) ? atuais : [];
 try {
@@ -44,6 +45,7 @@ const API_BASE = 'https://dadosabertos.almg.gov.br';
 const ESTADO_PATH = path.join(__dirname, 'estado.json');
 const ANO_ATUAL = new Date().getFullYear();
 const ITENS_POR_PAGINA = 50;
+const TIPOS_PRIORITARIOS = ['PL', 'PLC', 'PEC', 'MSG', 'VETO'];
 // ─── Estado ──────────────────────────────────────────────────────────────────
 function carregarEstado() {
   if (fs.existsSync(ESTADO_PATH)) {
@@ -69,9 +71,10 @@ function montarLinkProposicao(item) {
 }
 
 // ─── Busca proposições de uma página ─────────────────────────────────────────
-async function buscarPagina(pagina) {
+async function buscarPagina(pagina, tipo) {
   const params = new URLSearchParams({
     ano: ANO_ATUAL,
+    tipo,
     tp: ITENS_POR_PAGINA,
     p: pagina,
     ord: 0,       // 0 = data de publicação decrescente (mais recentes primeiro)
@@ -95,44 +98,49 @@ async function buscarPagina(pagina) {
 async function buscarProposicoesNovas(vistas) {
   const visitasSet = new Set(vistas);
   const novas = [];
-  let pagina = 1;
-  let totalPaginas = 1;
+  let primeiraRequisicao = true;
 
-  do {
-    if (pagina > 1) await sleep(1200); // respeita rate limit (mín 1s)
+  for (const tipo of TIPOS_PRIORITARIOS) {
+    let pagina = 1;
+    let totalPaginas = 1;
+    let encontrouVista = false;
+    let novasDoTipo = 0;
 
-    const resultado = await buscarPagina(pagina);
-    const itens = resultado.listaItem || [];
-    const total = resultado.noOcorrencias || 0;
-    totalPaginas = Math.ceil(total / ITENS_POR_PAGINA);
+    do {
+      if (!primeiraRequisicao) await sleep(1200); // respeita rate limit (mín 1s)
+      primeiraRequisicao = false;
 
-    console.log(`Página ${pagina}/${totalPaginas} — ${itens.length} proposições`);
+      const resultado = await buscarPagina(pagina, tipo);
+      const itens = resultado.listaItem || [];
+      const total = resultado.noOcorrencias || 0;
+      totalPaginas = Math.ceil(total / ITENS_POR_PAGINA);
 
-    let encontrouTodasVistas = false;
+      console.log(`${tipo}: página ${pagina}/${totalPaginas} — ${itens.length} proposições`);
 
-    for (const item of itens) {
-      const id = item.codigo || `${item.siglaTipoProjeto}-${item.numero}-${item.ano}`;
-      if (visitasSet.has(id)) {
-        // Chegamos em proposições já conhecidas — podemos parar
-        encontrouTodasVistas = true;
-        break;
+      for (const item of itens) {
+        const id = item.codigo || `${item.siglaTipoProjeto}-${item.numero}-${item.ano}`;
+        if (visitasSet.has(id)) {
+          encontrouVista = true;
+          break;
+        }
+        novas.push({
+          id,
+          tipo: item.siglaTipoProjeto || item.tipoProjeto || tipo,
+          numero: item.numero || '',
+          ano: item.ano || ANO_ATUAL,
+          autor: item.autor || item.nome || 'Não informado',
+          ementa: item.ementa || item.assunto || item.resumo || '',
+          data: item.dataPublicacao || '',
+          link: montarLinkProposicao(item)
+        });
+        novasDoTipo += 1;
       }
-      novas.push({
-        id,
-        tipo: item.siglaTipoProjeto || item.tipoProjeto || 'OUTROS',
-        numero: item.numero || '',
-        ano: item.ano || ANO_ATUAL,
-        autor: item.autor || item.nome || 'Não informado',
-        ementa: item.ementa || item.assunto || item.resumo || '',
-        data: item.dataPublicacao || '',
-        link: montarLinkProposicao(item)
-      });
-    }
 
-    if (encontrouTodasVistas) break;
-    pagina++;
+      pagina += 1;
+    } while (!encontrouVista && pagina <= totalPaginas && pagina <= 25);
 
-  } while (pagina <= totalPaginas && pagina <= 20); // limite de segurança: 20 páginas
+    console.log(`${tipo}: ${novasDoTipo} nova(s)`);
+  }
 
   return novas;
 }
@@ -621,11 +629,24 @@ async function main() {
   const estado = carregarEstado();
   console.log(`Estado carregado: ${estado.proposicoes_vistas.length} proposições conhecidas`);
 
-  const novas = await buscarProposicoesNovas(CONTROLE03_FORCE_LATEST ? [] : estado.proposicoes_vistas);
+  const novas = await buscarProposicoesNovas(estado.proposicoes_vistas);
   console.log(`Novas proposições encontradas: ${novas.length}`);
 
+  if (DRY_RUN) {
+    const resumo = novas.reduce((acc, item) => {
+      acc[item.tipo] = (acc[item.tipo] || 0) + 1;
+      return acc;
+    }, {});
+    console.log(`DRY_RUN — sem email, Controle 03 ou alteração de estado: ${JSON.stringify(resumo)}`);
+    return;
+  }
+
   if (CONTROLE03_FORCE_LATEST) {
-    await sincronizarRadar03(novas.slice(0, 120));
+    const loteControle03 = novas.slice(0, 120);
+    await sincronizarRadar03(loteControle03);
+    estado.proposicoes_vistas = [
+      ...new Set([...loteControle03.map(p => p.id), ...estado.proposicoes_vistas])
+    ].slice(0, 2000);
     estado.ultima_execucao = new Date().toISOString();
     salvarEstado(estado);
     console.log('✅ Radar 03 atualizado fora de hora com a lista atual da fonte. Email não enviado.');
