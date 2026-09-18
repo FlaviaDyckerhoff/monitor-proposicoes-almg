@@ -521,6 +521,7 @@ async function sincronizarRadar03(novas) {
         const base = Number.parseInt(String(item.base || baseAtual || 0), 10) || 0;
         item.tipo = det.tipo;
         item.mon = det.numeroInt;
+        item.ano = det.ano || item.ano || '';
         item.delta = det.numeroInt === base ? 0 : 1;
         item.sentido = det.numeroInt === base ? 'bate com o controle' : 'captado individualmente na fonte';
         item.fluxo = item.delta ? 'nao_consultado' : (item.fluxo || 'revisado');
@@ -531,6 +532,7 @@ async function sincronizarRadar03(novas) {
         item.clienteCitadoNomes = det.clienteCitadoNomes || item.clienteCitadoNomes || item.clienteSugestao || '';
         item.radar03Id = det.id || item.radar03Id || '';
         item.listaReal03 = true;
+        item.detalheIndividual03 = true;
       });
     });
 
