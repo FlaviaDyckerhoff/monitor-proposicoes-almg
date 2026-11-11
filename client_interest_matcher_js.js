@@ -75,6 +75,28 @@ function defaultPhase0ClientRules() {
   ];
 }
 
+
+// Flavia DM45934; ANTT Nova381/BR-381-MG e Nova364/BR-364-RO.
+// Só triagem nas quatro praças pedidas; não é citação nominal nem vínculo.
+function matchNovasRodovias(item, context = {}) {
+  const uf = normalizeText((item && item.uf) || context.uf).toUpperCase();
+  const city = normalizeText((item && (item.municipio || item.cidade)) || context.municipio).trim();
+  const house = normalizeText((item && (item.casa || item.house)) || context.casa).trim();
+  const mgHouses = ['almg', 'cmbh', 'mg - belo horizonte', 'belo horizonte'];
+  const roHouses = ['alero', 'ale-ro', 'ro - porto velho', 'porto velho'];
+  let road = null;
+  if ((!city || city === 'belo horizonte') && (!house || mgHouses.includes(house)) &&
+      (uf === 'MG' || (!uf && mgHouses.includes(house)))) road = '381';
+  if ((!city || city === 'porto velho') && (!house || roHouses.includes(house)) &&
+      (uf === 'RO' || (!uf && roHouses.includes(house)))) road = '364';
+  if (!road) return null;
+  const pattern = new RegExp('(^|[^a-z0-9_])br[\\s.\\-‐‑–—]*' + road + '(?![a-z0-9_])', 'i');
+  if (!pattern.test(normalizeText(itemSearchText(item || {})))) return null;
+  return { cliente: '4UM/Opportunity', cliente_id: '4um-opportunity', camada: '3',
+    territorio_status: 'foco', termos: ['BR-' + road], confidence: 'alta',
+    match_type: 'theme', motivo: 'rodovia da concessão — interesse potencial, conferir' };
+}
+
 function matchClientInterest(item, context = {}, rules = defaultPhase0ClientRules()) {
   const text = itemSearchText(item || {});
   const matches = [];
@@ -129,6 +151,8 @@ function matchClientInterest(item, context = {}, rules = defaultPhase0ClientRule
       });
     }
   }
+  const roadMatch = matchNovasRodovias(item, context);
+  if (roadMatch) matches.push(roadMatch);
   return matches.sort((a, b) => a.cliente.localeCompare(b.cliente, 'pt-BR'));
 }
 
@@ -156,6 +180,7 @@ function promoverInteresseClienteProposicao(item, clientesAtuais = [], context =
 }
 
 module.exports = {
+  matchNovasRodovias,
   defaultPhase0ClientRules,
   matchClientInterest,
   promoverInteresseClienteProposicao,
